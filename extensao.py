@@ -2,75 +2,111 @@ import requests as req
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 import json
+import re
+from requests import Session
+
 
 from models.extensaoinfo import ExtensaoInfo
 
 
 def generate_extensao(extensaoInfo:ExtensaoInfo):
-    headers = {
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-        'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-        'Cache-Control': 'max-age=0',
-        'Connection': 'keep-alive',
-        'Content-Type': 'application/x-www-form-urlencoded',
-        # 'Cookie': 'JSESSIONID=15DF67025B9FC8FE33F46B9A5FBA986D.srv1inst1',
-        'Origin': 'https://sigaa.sig.ufal.br',
-        'Referer': 'https://sigaa.sig.ufal.br/sigaa/public/extensao/consulta_extensao.jsf',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'same-origin',
-        'Sec-Fetch-User': '?1',
-        'Upgrade-Insecure-Requests': '1',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 OPR/109.0.0.0',
-        'sec-ch-ua': '"Opera GX";v="109", "Not:A-Brand";v="8", "Chromium";v="123"',
-        'sec-ch-ua-mobile': '?0',
-        'sec-ch-ua-platform': '"Windows"',
-    }
+    ROOT_URL = "https://sigaa.sig.ufal.br"
+    URL = urljoin(ROOT_URL, "/sigaa/public/extensao/consulta_extensao.jsf")
+    session = Session()
 
-    data = {
-        'formBuscaAtividade': extensaoInfo.formBuscaAtividade,
-        'formBuscaAtividade:selectBuscaTitulo': extensaoInfo.formBuscaAtividade_selectBuscaTitulo,
-        'formBuscaAtividade:buscaTitulo': extensaoInfo.formBuscaAtividade_buscaTitulo,
-        'formBuscaAtividade:buscaTipoAcao': extensaoInfo.formBuscaAtividade_buscaTipoAcao,
-        'formBuscaAtividade:buscaUnidade': extensaoInfo.formBuscaAtividade_buscaUnidade,
-        'formBuscaAtividade:nomeServidor': extensaoInfo.formBuscaAtividade_nomeServidor,
-        'formBuscaAtividade:suggestionNomeServ_selection': extensaoInfo.formBuscaAtividade_suggestionNomeServSelection,
-        'formBuscaAtividade:buscaAno': extensaoInfo.formBuscaAtividade_buscaAno, #deve sempre pegar o ano atual
-        'formBuscaAtividade:btBuscar': extensaoInfo.formBuscaAtividade_btBuscar,
-        'javax.faces.ViewState': extensaoInfo.javax_faces_ViewState,
-    }
-
-    ROOT_URL = "https://sigaa.sig.ufal.br/sigaa"
-    POST_PESQUISA_URL = urljoin(ROOT_URL, "/public/extensao/consulta_extensao.jsf;")#cookies jsessionid=15DF67025B9FC8FE33F46B9A5FBA986D.srv1inst1
-
-    html = req.post(POST_PESQUISA_URL, headers=headers, data=data).text
+    html = session.get(URL).text
     soup = BeautifulSoup(html, "html.parser")
-    table = soup.select_one("tbody")
-    extensoes = []
+    form = soup.select_one("#formBuscaAtividade")
+    action = urljoin(ROOT_URL, form.get("action"))
+    enc_type = form.get("enctype")
 
-    #tem que refatorar essa parte daqui
-    for row in table.select("tr"):
-        print("oi")
-        # Seleciona todas as <td> na linha
-        td = row.select("td")
-        
-        # O primeiro <td> pode conter um script, então precisamos ignorá-lo
-        ano_titulo = td[0].select_one("a").text.strip()  # Extrai o texto do link (título e ano)
-        
-        tipo = td[1].text.strip()  # Tipo da extensão
-        departamento = td[2].text.strip()  # Departamento/localização
-        
-        # Cria um dicionário com as informações extraídas
-        extensao = {
-            "ano_titulo": ano_titulo,
-            "tipo": tipo,
-            "departamento": departamento,
-        }
-        
-        # Adiciona ao resultado final
-        extensoes.append(extensao)
+    response = session.post(
+        action,
+        data= {
+            'formBuscaAtividade': extensaoInfo.formBuscaAtividade,
+            'formBuscaAtividade:selectBuscaTitulo': extensaoInfo.formBuscaAtividade_selectBuscaTitulo,
+            'formBuscaAtividade:buscaTitulo': extensaoInfo.formBuscaAtividade_buscaTitulo,
+            'formBuscaAtividade:buscaTipoAcao': extensaoInfo.formBuscaAtividade_buscaTipoAcao,
+            'formBuscaAtividade:buscaUnidade': extensaoInfo.formBuscaAtividade_buscaUnidade,
+            'formBuscaAtividade:nomeServidor': extensaoInfo.formBuscaAtividade_nomeServidor,
+            'formBuscaAtividade:suggestionNomeServ_selection': extensaoInfo.formBuscaAtividade_suggestionNomeServSelection,
+            'formBuscaAtividade:buscaAno': extensaoInfo.formBuscaAtividade_buscaAno, 
+            'formBuscaAtividade:btBuscar': extensaoInfo.formBuscaAtividade_btBuscar,
+            'javax.faces.ViewState': extensaoInfo.javax_faces_ViewState,
+        },
+        headers={
+            "Content-Type": enc_type,
+        },
+    )
 
-        # Retorna ou processa a lista de extensões conforme necessário
-        return extensoes    
-    
-    print(extensoes)
+    html = response.text
+    soup = BeautifulSoup(html, "html.parser")
+    form_result = soup.select_one("#form")
+    table_result = form_result.select_one("table.listagem")
+
+
+    for row in table_result.select_one('tbody'):
+        if row.name == 'tr':
+            cells = row.find_all('td')
+            
+            # Acessa e armazena os textos em variáveis
+            titulo = cells[0].find('a').get_text(strip=True)  
+            tipo_projeto = cells[1].get_text(strip=True)      
+            localizacao = cells[2].get_text(strip=True)
+
+            # Acessa a tag a e pega o id da url dos detalhes
+            onclick = cells[0].find('a').get('onclick')
+            id_detalhes = re.search(r"idAtividadeExtensaoSelecionada':'(\d+)'", onclick)
+
+        
+
+            # Lógica para web scrapping da pagina de detalhes  
+            response_detalhes = session.get(f'http://sigaa.sig.ufal.br/sigaa/link/public/extensao/visualizacaoAcaoExtensao/{id_detalhes.group(1)}')
+            html_detalhes = response_detalhes.text
+            soup = BeautifulSoup(html_detalhes, "html.parser")
+            table = soup.select_one("table.visualizacao")
+
+            #dados da primeira seção pagina de detalhes
+            data = {}
+
+            if table:  
+                for row in table.find_all('tr'):  
+                    th_elements = row.find_all('th')
+                    td_elements = row.find_all('td')
+                    
+                    if th_elements and td_elements:  # Verifica se ambos os <th> e <td> existem
+                        for th, td in zip(th_elements, td_elements):
+                            key = th.get_text(strip=True)
+                            value = td.get_text(strip=True)
+                            data[key] = value
+            
+            #dados do resumo e público alvo
+            resumo_h4 = soup.find('h4', string=" Resumo ")
+            resumo = ""
+            if resumo_h4:
+                resumo_p = resumo_h4.find_next('p')
+                resumo = resumo_p.get_text(strip=True)
+
+            publico_alvo_h4 = soup.find('h4', string="Público Alvo ")
+            publico_alvo = ""
+            if publico_alvo_h4:
+                publico_alvo = publico_alvo_h4.find_next('p')
+                publico_alvo = publico_alvo.get_text(strip=True)
+
+            #dados dos nomes, fotos e status dos membros
+            membros = soup.find_all('div', class_='foto')
+
+            extensao = {
+                "titulo": titulo,
+                "tipo_projeto": tipo_projeto,
+                "UP": localizacao,
+                "detalhes":
+                    {
+                        "data": data,
+                        "resumo": resumo,
+                        "publico_alvo": publico_alvo,
+                        "membros": membros
+                    },
+            }
+
+            print(extensao)
