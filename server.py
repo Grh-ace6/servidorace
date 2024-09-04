@@ -1,7 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
+from typing import List
 from models.portariainfo import PortariaInfo
 from portarias import generate_portarias
-from models.extensaoinfo import ExtensaoInfo
+from extensoes.extensaoPesquisa import generate_extensao
+from extensoes.extensaoDetalhes import generate_extensaoDetalhes
 
 
 app = FastAPI()
@@ -12,5 +14,9 @@ def read_portarias(portariaInfo:PortariaInfo):
     return generate_portarias(portariaInfo)
 
 @app.get("/extensao")
-def read_extensao(extensaoInfo:ExtensaoInfo):
-    return 
+def read_extensao():
+   return generate_extensao()
+
+@app.get("/extensao/{id}")
+def read_extensao_id(id: int):
+    return generate_extensaoDetalhes(id=id)
