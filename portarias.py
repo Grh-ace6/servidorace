@@ -32,9 +32,11 @@ def generate_portarias(portariaInfo:PortariaInfo):
     html = req.post(POST_PESQUISA_URL, headers=headers, data=data).text
     soup = BeautifulSoup(html, "html.parser")
     table = soup.select_one("tbody.listagem")
+    valor_maximo = soup.select_one("input#pageMax").get('value')
 
     portarias = []
 
+    
 
     for row in table.select("tr"):
         td = row.select("td")
@@ -64,6 +66,7 @@ def generate_portarias(portariaInfo:PortariaInfo):
                 "url": boletim_url,
                 "nome": boletim_nome,
             },
+            "valor_maximo": valor_maximo,
             "detalhes": detalhes,
             "url_detalhes": detalhes_url,
         }
