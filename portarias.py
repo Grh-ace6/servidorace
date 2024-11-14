@@ -36,8 +36,6 @@ def generate_portarias(portariaInfo:PortariaInfo):
 
     portarias = []
 
-    
-
     for row in table.select("tr"):
         td = row.select("td")
         assert len(td) == 5
@@ -57,6 +55,7 @@ def generate_portarias(portariaInfo:PortariaInfo):
 
         detalhes_id =  detalhes.get('solicitacao.id')
         detalhes_url = "https://sipac.sig.ufal.br/sipac/VerInformativo?id=" + detalhes_id
+        imprimir_url = "https://sipac.sig.ufal.br/sipac/VerInformativo?id=" + detalhes_id +"&imprimir=true"
 
         portaria = {
             "cadastro": cadastro,
@@ -69,8 +68,9 @@ def generate_portarias(portariaInfo:PortariaInfo):
             "paginas_maximo": paginas_maximo,
             "detalhes": detalhes,
             "url_detalhes": detalhes_url,
+            "imprimir_url": imprimir_url
         }
         portarias.append(portaria)
-        
+
     return portarias
 
